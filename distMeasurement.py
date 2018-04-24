@@ -3,7 +3,9 @@ import struct
 import time
 import ipaddress
 import select
-
+"""To run the traceroute make sure that the "targets.txt" file is in the same directory
+as the distMeasurement file and run by using "sudo python3 distMeasurement.py"
+"""
 class TraceRoute(object):
     def getfile(dst='targets.txt'):
         f = open(dst)
@@ -58,20 +60,23 @@ class TraceRoute(object):
         msg = 'measurement for class project. questions to student abc123@case.edu or professor mxr136@case.edu'
         payload = bytes(msg + 'a'*(1472 - len(msg)),'ascii')
         startTimer = time.time()
-        recv_sock_list, ready_to_write, in_error = select.select([recv_sock],[send_sock],'',20)
-        print(recv_sock_list)
         send_sock.sendto(payload, (destination_ip, self.port))
-        while True:
-            try:
-                icmp_packet = recv_sock_list[recv_sock].recv(65536)
-                print(icmp_packet)
-                entTimer = time.time()
-            except socket.error as e:
-                raise IOError('socket error {}'.format((e)))
-            finally:
-                recv_sock.close()
-                send_sock.close()
-
+        icmp_packet = None;
+        try:
+            recv_sock_list, ready_to_write, in_error = select.select([recv_sock],'','',2)
+            if(recv_sock_list != None):
+                for s in recv_sock_list:
+                    icmp_packet = s.recv(65536)
+                    entTimer = time.time()
+        except socket.error as e:
+            raise IOError('socket error {}'.format((e)))
+        finally:
+            recv_sock.close()
+            send_sock.close()
+        if(icmp_packet == None):
+            print('Timeout occurred!')
+           ## break;
+        else:
             ###This is unpacking the ICMP message and getting the needed fields out of it.
             port_from_packet = struct.unpack("!H", icmp_packet[portNumberAddress:portNumberAddress+2])[0]
             ip_from_packet = struct.unpack("!I",icmp_packet[sourceIPAddress:sourceIPAddress+4])[0]
@@ -85,14 +90,14 @@ class TraceRoute(object):
             ##We are checking whether the port numbers match up if yes we can confirm it is from our probe
             if port_from_packet == self.port:
                 timeCost = round((entTimer - startTimer) * 1000, 2)
-                print('Hops:',self.ttl - ttl_of_packet, 'IP address:',readable_ip,'Time:', timeCost,'ms','Bytes of original datagram:',len(icmp_packet)-end_of_icmp)
+                print('Hops:',self.ttl - ttl_of_packet, 'IP address:',readable_ip,'Time:', timeCost,'ms','Bytes Left:',len(icmp_packet)-end_of_icmp)
             else:
                 print(self.ttl)
-            self.ttl += 1
-            if(self.ttl > self.hops ):
-                break
-            elif(icmp_message_code == 3 and icmp_message_type == 3):
-                break
+            self.ttl += 100
+            ##if(self.ttl > self.hops ):
+                ##break
+            ##elif(icmp_message_code == 3 and icmp_message_type == 3):
+                ##break
 
     def create_listener(self):
         """
